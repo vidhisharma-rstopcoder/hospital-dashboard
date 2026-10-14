@@ -8,6 +8,8 @@ Live: https://web-five-mauve-71.vercel.app
 
 ## Screenshots
 
+![Sign in](screenshots/login.png)
+
 ![Dashboard](screenshots/dashboard.png)
 
 ![Ward list](screenshots/patients.png)
