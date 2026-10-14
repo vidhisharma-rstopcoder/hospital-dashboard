@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hospital_dashboard/theme/app_colors.dart';
 import 'package:hospital_dashboard/theme/app_theme.dart';
+import 'package:hospital_dashboard/common/widgets/entrance.dart';
 import 'package:hospital_dashboard/common/widgets/shimmer_box.dart';
 import 'package:hospital_dashboard/common/widgets/state_message.dart';
 import 'package:hospital_dashboard/common/widgets/surface_card.dart';
@@ -81,75 +82,76 @@ class _PatientsPageState extends ConsumerState<PatientsPage> {
     final query = queryFromUri(uri);
     final result = ref.watch(patientListProvider(query));
     final statusValue = query.status?.label ?? 'All';
+    final total = result.value?.total;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Patients', style: AppType.title),
-          const SizedBox(height: 6),
-          const Text('Search by name or patient ID.', style: AppType.body),
-          const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final stacked = constraints.maxWidth < 720;
-              final search = TextField(
-                controller: _search,
-                onChanged: _onSearchChanged,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  hintText: 'Search name or patient ID',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: _search.text.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: 'Clear search',
-                          onPressed: () {
-                            _search.clear();
-                            _appliedQuery = '';
-                            _go(search: '', page: 1);
-                          },
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                ),
-              );
-              final filter = DropdownButtonFormField<String>(
-                key: ValueKey(statusValue),
-                initialValue: statusValue,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.filter_alt_outlined),
-                ),
-                items: [
-                  const DropdownMenuItem(
-                    value: 'All',
-                    child: Text('All statuses'),
+          Entrance(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Ward list', style: AppType.title),
+                      SizedBox(height: 6),
+                      Text('Name or ID.', style: AppType.body),
+                    ],
                   ),
-                  for (final status in PatientStatus.values)
-                    DropdownMenuItem(
-                      value: status.label,
-                      child: Text(status.label),
-                    ),
-                ],
-                onChanged: (value) {
-                  if (value == null) return;
-                  _go(status: value, page: 1);
-                },
-              );
-              if (stacked) {
-                return Column(
-                  children: [search, const SizedBox(height: 10), filter],
+                ),
+                if (total != null) _TotalPill(total: total),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Entrance(
+            delay: const Duration(milliseconds: 40),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked = constraints.maxWidth < 720;
+                final search = TextField(
+                  controller: _search,
+                  onChanged: _onSearchChanged,
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: 'Search name or ID',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _search.text.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: () {
+                              _search.clear();
+                              _appliedQuery = '';
+                              _go(search: '', page: 1);
+                            },
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                  ),
                 );
-              }
-              return Row(
-                children: [
-                  Expanded(flex: 3, child: search),
-                  const SizedBox(width: 12),
-                  Expanded(flex: 2, child: filter),
-                ],
-              );
-            },
+                final filter = _StatusFilters(
+                  selected: statusValue,
+                  onSelected: (value) => _go(status: value, page: 1),
+                );
+                if (stacked) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [search, const SizedBox(height: 10), filter],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(flex: 3, child: search),
+                    const SizedBox(width: 12),
+                    Flexible(flex: 4, child: filter),
+                  ],
+                );
+              },
+            ),
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -229,6 +231,122 @@ class _PatientsPageState extends ConsumerState<PatientsPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TotalPill extends StatelessWidget {
+  const _TotalPill({required this.total});
+
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(total),
+      tween: Tween(begin: 0, end: total.toDouble()),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: Text(
+            '${value.round()} on file',
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StatusFilters extends StatelessWidget {
+  const _StatusFilters({required this.selected, required this.onSelected});
+
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final options = [
+      'All',
+      for (final status in PatientStatus.values) status.label,
+    ];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final option in options) ...[
+            _StatusChipButton(
+              label: option == 'All' ? 'All' : option,
+              selected: selected == option,
+              onTap: () => onSelected(option),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusChipButton extends StatefulWidget {
+  const _StatusChipButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_StatusChipButton> createState() => _StatusChipButtonState();
+}
+
+class _StatusChipButtonState extends State<_StatusChipButton> {
+  var _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = widget.selected;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.ink
+                : _hover
+                ? AppColors.mint
+                : AppColors.white,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected ? AppColors.ink : AppColors.line,
+            ),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              color: selected ? Colors.white : AppColors.ink,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -1,14 +1,16 @@
-# City Hospital — inpatient dashboard
+# Rounds
 
-Flutter web app for the inpatient desk: staff login, summary cards, an admissions chart, and a patient list with a details page.
+Flutter web app for City Hospital. Staff sign in, check today's admissions, and open a patient from the ward list.
 
 The Flutter project is this `hospital_dashboard` folder. The Android project in the parent folder is separate.
+
+Live: https://web-five-mauve-71.vercel.app
 
 ## Screenshots
 
 ![Dashboard](screenshots/dashboard.png)
 
-![Patient listing](screenshots/patients.png)
+![Ward list](screenshots/patients.png)
 
 ## Setup and run
 
@@ -42,8 +44,8 @@ The session is stored with `shared_preferences`. A refresh keeps you signed in. 
 ## What it does
 
 - Login with email and password. Empty, badly formatted, and wrong credentials show an error.
-- Dashboard cards: total patients, currently admitted, discharged, and today's admissions. A donut shows status counts and a bar chart shows the last 7 days.
-- Patient list: ID, name, gender, date of birth, admission date, status, and a view action. Search by name or ID, filter by status, 10 rows per page.
+- Dashboard is titled Rounds. Cards: total patients, currently admitted, discharged, and today's admissions. A donut shows status counts and a bar chart shows the last 7 days.
+- Ward list: ID, name, gender, date of birth, admission date, status, and Open. Search by name or ID. Status is a row of chips (All, Admitted, Discharged, Observation, Critical). 10 rows per page. The count on the right is how many records match.
 - Patient details at `/patients/123` (Rahul Sharma). Refresh, back, and forward keep the route. List filters are in the query string (`q`, `status`, `page`).
 - Desktop uses a sidebar and a table. Tablet uses an icon rail. Phone uses a drawer and cards, so the page does not scroll sideways.
 
@@ -92,7 +94,7 @@ flutter run -d chrome \
   --dart-define=API_BASE_URL=https://api.example.com
 ```
 
-Routes are path URLs (`/dashboard`, `/patients`, `/patients/123`), not hash URLs.
+Routes are path URLs (`/dashboard`, `/patients`, `/patients/123`), not hash URLs. The browser tab title is `Rounds — City Hospital`.
 
 ## Build and deploy
 
@@ -100,13 +102,15 @@ Routes are path URLs (`/dashboard`, `/patients`, `/patients/123`), not hash URLs
 flutter build web --release
 ```
 
-Output is `build/web`. Host that folder on any static server. Unknown paths such as `/patients/123` must fall back to `index.html`.
+Output is `build/web`. Host that folder on any static server. Unknown paths such as `/patients/123` must fall back to `index.html`. `web/vercel.json` does that for Vercel and is copied into the build.
 
 ```nginx
 location / {
   try_files $uri $uri/ /index.html;
 }
 ```
+
+The production site is https://web-five-mauve-71.vercel.app. A new release is `flutter build web --release`, then deploy the `build/web` folder.
 
 If the site is not at the domain root:
 

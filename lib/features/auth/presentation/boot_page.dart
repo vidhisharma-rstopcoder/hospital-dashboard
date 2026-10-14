@@ -21,7 +21,7 @@ class BootPage extends StatelessWidget {
                 HospitalLogo(size: 52),
                 SizedBox(height: 18),
                 Text(
-                  'City Hospital',
+                  'Rounds',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 22,

@@ -179,7 +179,7 @@ class _LoginForm extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Staff email and password for the inpatient desk.',
+              'Ward email and password.',
               style: TextStyle(
                 color: AppColors.muted,
                 fontSize: 15.5,
@@ -431,7 +431,7 @@ class _CompactBrand extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'City Hospital',
+                          'Rounds',
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -441,7 +441,7 @@ class _CompactBrand extends StatelessWidget {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          'Inpatient desk',
+                          'City Hospital',
                           style: TextStyle(
                             color: Color(0xFFC7CDD8),
                             fontWeight: FontWeight.w500,
@@ -479,7 +479,7 @@ class _BrandPanel extends StatelessWidget {
                   HospitalLogo(size: 40),
                   SizedBox(width: 12),
                   Text(
-                    'City Hospital',
+                    'Rounds',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -491,7 +491,7 @@ class _BrandPanel extends StatelessWidget {
               ),
               Spacer(),
               Text(
-                'Inpatient desk',
+                'Rounds',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 44,
@@ -504,7 +504,7 @@ class _BrandPanel extends StatelessWidget {
               SizedBox(
                 width: 420,
                 child: Text(
-                  'Admissions, current inpatients, and discharge. Built for the ward desktop and a phone during rounds.',
+                  'Who was admitted, who is still here, and who went home.',
                   style: TextStyle(
                     color: Color(0xFFD5DBE6),
                     fontSize: 16,

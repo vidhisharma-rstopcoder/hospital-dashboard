@@ -90,7 +90,7 @@ class _MobileBar extends StatelessWidget {
               const HospitalLogo(size: 30),
               const SizedBox(width: 10),
               const Text(
-                'City Hospital',
+                'Rounds',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 15,
@@ -236,7 +236,7 @@ class _BrandLockup extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'City Hospital',
+                  'Rounds',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
@@ -246,7 +246,7 @@ class _BrandLockup extends StatelessWidget {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'Inpatient desk',
+                  'City Hospital',
                   style: TextStyle(
                     color: Color(0xFF9AA3B2),
                     fontSize: 12,

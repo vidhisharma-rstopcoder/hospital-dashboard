@@ -11,7 +11,7 @@ class HospitalApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
-      title: 'City Hospital',
+      title: 'Rounds',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       scrollBehavior: const AppScrollBehavior(),

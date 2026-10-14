@@ -169,10 +169,10 @@ class _Header extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Inpatient dashboard', style: AppType.title),
+              const Text('Rounds', style: AppType.title),
               const SizedBox(height: 8),
               Text(
-                DateFormat('EEEE, d MMMM yyyy').format(now),
+                'City Hospital  ·  ${DateFormat('EEEE, d MMMM').format(now)}',
                 style: AppType.body,
               ),
             ],

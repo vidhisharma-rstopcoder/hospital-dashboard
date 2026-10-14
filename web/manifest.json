@@ -1,11 +1,11 @@
 {
-    "name": "City Hospital",
-    "short_name": "City Hospital",
+    "name": "Rounds",
+    "short_name": "Rounds",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#F4F5F7",
     "theme_color": "#0B0D12",
-    "description": "Staff dashboard for City Hospital admissions and patient records.",
+    "description": "City Hospital ward list.",
     "orientation": "any",
     "prefer_related_applications": false,
     "icons": [

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hospital_dashboard/common/format.dart';
+import 'package:hospital_dashboard/common/widgets/entrance.dart';
 import 'package:hospital_dashboard/theme/app_colors.dart';
 import 'package:hospital_dashboard/common/widgets/status_chip.dart';
 import 'package:hospital_dashboard/features/patients/domain/patient.dart';
@@ -18,10 +19,14 @@ class PatientTable extends StatelessWidget {
         const _HeaderRow(),
         const Divider(height: 1, color: AppColors.line),
         for (var i = 0; i < patients.length; i++)
-          _PatientRow(
-            patient: patients[i],
-            striped: i.isOdd,
-            onOpen: () => onOpen(patients[i]),
+          Entrance(
+            delay: Duration(milliseconds: 35 * i),
+            offset: 8,
+            child: _PatientRow(
+              patient: patients[i],
+              striped: i.isOdd,
+              onOpen: () => onOpen(patients[i]),
+            ),
           ),
       ],
     );
@@ -39,11 +44,11 @@ class _HeaderRow extends StatelessWidget {
         children: [
           _Head('Patient ID', flex: 11),
           _Head('Patient name', flex: 22),
-          _Head('Gender', flex: 12),
+          _Head('Gender', flex: 10),
           _Head('Date of birth', flex: 16),
           _Head('Admission date', flex: 16),
           _Head('Status', flex: 16),
-          _Head('Actions', flex: 10),
+          _Head('Actions', flex: 12),
         ],
       ),
     );
@@ -110,8 +115,16 @@ class _PatientRowState extends State<_PatientRow> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             curve: Curves.easeOutCubic,
-            color: background,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(13, 12, 16, 12),
+            decoration: BoxDecoration(
+              color: background,
+              border: Border(
+                left: BorderSide(
+                  color: _hover ? AppColors.teal : Colors.transparent,
+                  width: 3,
+                ),
+              ),
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -142,7 +155,7 @@ class _PatientRowState extends State<_PatientRow> {
                   ),
                 ),
                 Expanded(
-                  flex: 12,
+                  flex: 10,
                   child: Text(patient.gender, overflow: TextOverflow.ellipsis),
                 ),
                 Expanded(
@@ -171,16 +184,34 @@ class _PatientRowState extends State<_PatientRow> {
                   ),
                 ),
                 Expanded(
-                  flex: 10,
+                  flex: 12,
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed: widget.onOpen,
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                      child: const Text('View'),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton(
+                          onPressed: widget.onOpen,
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          child: const Text('Open'),
+                        ),
+                        AnimatedSlide(
+                          offset: _hover ? Offset.zero : const Offset(-0.3, 0),
+                          duration: const Duration(milliseconds: 160),
+                          child: AnimatedOpacity(
+                            opacity: _hover ? 1 : 0,
+                            duration: const Duration(milliseconds: 160),
+                            child: const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 16,
+                              color: AppColors.teal,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

@@ -11,7 +11,7 @@ class HospitalLogo extends StatelessWidget {
     final cross = size * 0.4;
     final thickness = size * 0.11;
     return Semantics(
-      label: 'City Hospital',
+      label: 'Rounds',
       child: Container(
         width: size,
         height: size,
