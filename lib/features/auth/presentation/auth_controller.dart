@@ -1,4 +1,5 @@
 import 'package:hospital_dashboard/features/auth/data/auth_repository.dart';
+import 'package:hospital_dashboard/features/auth/data/tab_session.dart';
 import 'package:hospital_dashboard/features/clinic/data/clinic_store.dart';
 import 'package:hospital_dashboard/features/clinic/domain/clinic_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -101,10 +102,13 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> _restore() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final email = prefs.getString(sessionEmailKey);
+      final email = await readTabSessionEmail();
       if (!ref.mounted) return;
       if (email == null || email.isEmpty) {
+        // Drop the old shared localStorage session so two tabs can differ.
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(sessionEmailKey);
+        if (!ref.mounted) return;
         state = AuthState.signedOut();
         return;
       }
@@ -130,8 +134,9 @@ class AuthController extends Notifier<AuthState> {
     try {
       final store = await ref.read(clinicStoreProvider.future);
       final user = await store.authenticate(email, password);
+      await writeTabSessionEmail(user.email);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(sessionEmailKey, user.email);
+      await prefs.remove(sessionEmailKey);
       if (!ref.mounted) return false;
       state = AuthState.signedIn(
         user.email,
@@ -155,6 +160,7 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> signOut() async {
+    await clearTabSessionEmail();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(sessionEmailKey);
     if (!ref.mounted) return;

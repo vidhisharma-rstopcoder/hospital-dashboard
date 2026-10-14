@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hospital_dashboard/features/auth/data/auth_repository.dart';
 import 'package:hospital_dashboard/features/clinic/data/clinic_bus.dart';
 import 'package:hospital_dashboard/features/clinic/data/password_hash.dart';
@@ -559,10 +561,23 @@ class ClinicStore {
   ) async* {
     await _requireConversation(actor, conversationId);
     yield await _messagesFor(conversationId);
-    await for (final topic in _bus.events) {
-      if (topic == 'chat:$conversationId') {
+
+    final wake = StreamController<void>();
+    final busSub = _bus.events.listen((topic) {
+      if (topic == 'chat:$conversationId') wake.add(null);
+    });
+    // Poll so the other browser tab's IndexedDB writes show up quickly.
+    final timer = Timer.periodic(const Duration(milliseconds: 800), (_) {
+      if (!wake.isClosed) wake.add(null);
+    });
+    try {
+      await for (final _ in wake.stream) {
         yield await _messagesFor(conversationId);
       }
+    } finally {
+      await busSub.cancel();
+      timer.cancel();
+      await wake.close();
     }
   }
 
@@ -598,6 +613,7 @@ class ClinicStore {
       route: '/messages/$conversationId',
     );
     _bus.publish('chat:$conversationId');
+    _bus.publish('unread');
     return message;
   }
 

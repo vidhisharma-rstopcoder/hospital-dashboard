@@ -58,7 +58,7 @@ The session email is stored with `shared_preferences`. The role is read again fr
 
 Records are stored with sembast (IndexedDB on web, a file on desktop). They survive a browser refresh. Shared preferences holds only the signed-in email.
 
-In-app updates use a broadcast stream. On web, a second tab signed in as the other person receives new messages and notifications through `BroadcastChannel`. That is real delivery inside one browser, not a timer. It is not cross-device sync.
+In-app updates use a broadcast stream. On web, each browser tab keeps its own sign-in, so Anil can stay open in one tab and Rahul in another. New messages show through `BroadcastChannel` plus a short poll while the chat is open. That is live delivery inside one browser. It is not cross-device or cross-browser sync.
 
 Firebase is not connected. `firestore.rules` is the access policy to deploy if you add Firebase Authentication and Cloud Firestore later. OS push notifications are not implemented, because Firebase Cloud Messaging and Cloud Functions need a project and must not ship with a server key in the app. Do not describe the current chat as Firebase realtime.
 

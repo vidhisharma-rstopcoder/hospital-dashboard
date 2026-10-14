@@ -7,6 +7,7 @@ import 'package:hospital_dashboard/features/auth/presentation/auth_controller.da
 import 'package:hospital_dashboard/features/clinic/data/clinic_store.dart';
 import 'package:hospital_dashboard/features/clinic/domain/clinic_models.dart';
 import 'package:hospital_dashboard/features/clinic/presentation/clinic_providers.dart';
+import 'package:hospital_dashboard/theme/app_colors.dart';
 import 'package:hospital_dashboard/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 
@@ -24,7 +25,7 @@ class MessagesPage extends ConsumerWidget {
           const Text('Messages', style: AppType.title),
           const SizedBox(height: 6),
           const Text(
-            'Chat opens only for an assigned doctor and patient.',
+            'Open Anil in one tab and Rahul in another to see replies live. Chat only works after a doctor is assigned.',
             style: AppType.body,
           ),
           const SizedBox(height: 16),
@@ -213,7 +214,31 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 onPressed: () => context.go('/messages'),
                 icon: const Icon(Icons.arrow_back_rounded),
               ),
-              const Text('Conversation', style: AppType.section),
+              const Expanded(
+                child: Text('Live conversation', style: AppType.section),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.mint,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.circle, size: 8, color: AppColors.discharged),
+                    SizedBox(width: 6),
+                    Text(
+                      'Live',
+                      style: TextStyle(
+                        color: AppColors.discharged,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -272,10 +297,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                           padding: const EdgeInsets.all(12),
                           constraints: const BoxConstraints(maxWidth: 420),
                           decoration: BoxDecoration(
-                            color: mine
-                                ? const Color(0xFF111827)
-                                : Colors.white,
+                            color: mine ? AppColors.teal : Colors.white,
                             borderRadius: BorderRadius.circular(14),
+                            border: mine
+                                ? null
+                                : Border.all(color: AppColors.line),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.teal.withValues(
+                                  alpha: mine ? 0.18 : 0.04,
+                                ),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -283,17 +318,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                               Text(
                                 message.text,
                                 style: TextStyle(
-                                  color: mine ? Colors.white : Colors.black,
+                                  color: mine ? Colors.white : AppColors.ink,
+                                  fontWeight: FontWeight.w500,
+                                  height: 1.35,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${DateFormat('h:mm a').format(message.createdAt)} · ${message.deliveryStatus.name}',
+                                DateFormat('h:mm a').format(message.createdAt),
                                 style: TextStyle(
                                   color: mine
-                                      ? const Color(0xFFD1D5DB)
-                                      : const Color(0xFF6B7280),
+                                      ? Colors.white.withValues(alpha: 0.8)
+                                      : AppColors.muted,
                                   fontSize: 11,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
@@ -322,14 +360,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     controller: _text,
                     minLines: 1,
                     maxLines: 4,
-                    decoration: const InputDecoration(hintText: 'Message'),
+                    textInputAction: TextInputAction.send,
+                    decoration: const InputDecoration(
+                      hintText: 'Write a message',
+                    ),
                     onSubmitted: (_) => _send(),
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton.filled(
+                FilledButton(
                   onPressed: _sending ? null : _send,
-                  icon: const Icon(Icons.send_rounded),
+                  child: _sending
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.send_rounded),
                 ),
               ],
             ),
