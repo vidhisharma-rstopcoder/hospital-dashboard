@@ -49,7 +49,7 @@ The session email is stored with `shared_preferences`. The role is read again fr
 - Ward list: ID, name, gender, date of birth, admission date, status, and Open. Search by name or ID. Status chips are All, Admitted, Discharged, Under Observation, and Critical. The address bar still uses `Observation`. 10 rows per page. The count on the right is how many records match.
 - Patient details at `/patients/123` (Rahul Sharma). Refresh, back, and forward keep the route. List filters are in the query string (`q`, `status`, `page`).
 - Desktop uses a sidebar and a table. Tablet uses an icon rail. Phone uses a drawer and cards, so the page does not scroll sideways.
-- Admin can register, edit, and delete patients and doctors. A patient record includes contact details, blood group, history, allergies, medications, emergency contact, and an assigned doctor.
+- Admin can register, edit, and delete patients and doctors. Registration asks for a password, and that email and password are the person's sign-in. A patient record includes contact details, blood group, history, allergies, medications, emergency contact, and an assigned doctor. After a doctor is assigned, those two accounts can open Messages and chat.
 - A doctor keeps a profile with specialization, fee, days, time slots, and an optional photo. Cards can be searched and filtered by specialization.
 - Assignment stores patient id and doctor id on a relationship (`pending`, `active`, `inactive`). One active doctor per patient. Reassigning closes the previous active link. The patient profile and the doctor's patient list both read that link.
 - A patient can request a consultation. The doctor accepts, rejects, or either side cancels. Each step writes a notification.

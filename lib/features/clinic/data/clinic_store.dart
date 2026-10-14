@@ -93,8 +93,16 @@ class ClinicStore {
     return patient;
   }
 
-  Future<Patient> createPatient(Actor actor, Patient draft) async {
+  Future<Patient> createPatient(
+    Actor actor,
+    Patient draft, {
+    required String password,
+  }) async {
     _policy.createPatient(actor);
+    _requirePassword(password);
+    if (await userByEmail(draft.email) != null) {
+      throw ClinicException('This email already has a login.');
+    }
     final keys = await _patients.findKeys(_db);
     final id = keys.isEmpty ? 123 : keys.reduce((a, b) => a > b ? a : b) + 1;
     final patient = Patient(
@@ -120,6 +128,14 @@ class ClinicStore {
       medications: draft.medications.trim(),
     );
     await _patients.record(id).put(_db, patient.toJson());
+    await _syncLogin(
+      previousEmail: '',
+      email: patient.email,
+      name: patient.name,
+      role: UserRole.patient,
+      password: password,
+      patientId: id,
+    );
     await _notify(
       email: _adminEmail,
       title: 'Patient registered',
@@ -130,8 +146,12 @@ class ClinicStore {
     return patient;
   }
 
-  Future<Patient> updatePatient(Actor actor, Patient draft) async {
-    await _patientOrThrow(draft.id);
+  Future<Patient> updatePatient(
+    Actor actor,
+    Patient draft, {
+    String password = '',
+  }) async {
+    final previous = await _patientOrThrow(draft.id);
     final assigned = await _doctorAssigned(actor, draft.id);
     _policy.writePatient(actor, patientId: draft.id, assignedToActor: assigned);
     final saved = draft.copyWith(
@@ -141,6 +161,15 @@ class ClinicStore {
       emergencyContactPhone: _digits(draft.emergencyContactPhone),
     );
     await _patients.record(saved.id).put(_db, saved.toJson());
+    await _syncLogin(
+      previousEmail: previous.email,
+      email: saved.email,
+      name: saved.name,
+      role: UserRole.patient,
+      password: password,
+      patientId: saved.id,
+      doctorId: (await activeRelationship(saved.id))?.doctorId,
+    );
     _bus.publish('patients');
     return saved;
   }
@@ -163,6 +192,8 @@ class ClinicStore {
       );
     }
     await _patients.record(id).delete(_db);
+    final login = await _userForPatient(id);
+    if (login != null) await _users.record(login.email).delete(_db);
     await _notify(
       email: _adminEmail,
       title: 'Patient removed',
@@ -208,8 +239,16 @@ class ClinicStore {
     return doctor;
   }
 
-  Future<Doctor> createDoctor(Actor actor, Doctor draft) async {
+  Future<Doctor> createDoctor(
+    Actor actor,
+    Doctor draft, {
+    required String password,
+  }) async {
     _policy.createDoctor(actor);
+    _requirePassword(password);
+    if (await userByEmail(draft.email) != null) {
+      throw ClinicException('This email already has a login.');
+    }
     final keys = await _doctors.findKeys(_db);
     var max = 1000;
     for (final key in keys) {
@@ -232,12 +271,24 @@ class ClinicStore {
       photoDataUrl: draft.photoDataUrl,
     );
     await _doctors.record(doctor.id).put(_db, doctor.toJson());
+    await _syncLogin(
+      previousEmail: '',
+      email: doctor.email,
+      name: doctor.name,
+      role: UserRole.doctor,
+      password: password,
+      doctorId: doctor.id,
+    );
     _bus.publish('doctors');
     return doctor;
   }
 
-  Future<Doctor> updateDoctor(Actor actor, Doctor draft) async {
-    await _doctorOrThrow(draft.id);
+  Future<Doctor> updateDoctor(
+    Actor actor,
+    Doctor draft, {
+    String password = '',
+  }) async {
+    final previous = await _doctorOrThrow(draft.id);
     _policy.writeDoctor(actor, draft.id);
     final saved = draft.copyWith(
       name: draft.name.trim(),
@@ -245,6 +296,14 @@ class ClinicStore {
       phone: _digits(draft.phone),
     );
     await _doctors.record(saved.id).put(_db, saved.toJson());
+    await _syncLogin(
+      previousEmail: previous.email,
+      email: saved.email,
+      name: saved.name,
+      role: UserRole.doctor,
+      password: password,
+      doctorId: saved.id,
+    );
     _bus.publish('doctors');
     return saved;
   }
@@ -266,6 +325,8 @@ class ClinicStore {
       }
     }
     await _doctors.record(id).delete(_db);
+    final login = await _userForDoctor(id);
+    if (login != null) await _users.record(login.email).delete(_db);
     _bus.publish('doctors');
   }
 
@@ -465,7 +526,22 @@ class ClinicStore {
     );
     final id = 'c-$patientId-$doctorId';
     final existing = await _conversations.record(id).get(_db);
-    if (existing != null) return Conversation.fromJson(existing);
+    if (existing != null) {
+      final current = Conversation.fromJson(existing);
+      if (current.patientEmail == patientEmail &&
+          current.doctorEmail == doctorEmail) {
+        return current;
+      }
+      final refreshed = Conversation(
+        id: current.id,
+        patientId: current.patientId,
+        doctorId: current.doctorId,
+        patientEmail: patientEmail,
+        doctorEmail: doctorEmail,
+      );
+      await _conversations.record(id).put(_db, refreshed.toJson());
+      return refreshed;
+    }
     final created = Conversation(
       id: id,
       patientId: patientId,
@@ -922,6 +998,120 @@ class ClinicStore {
         .toList();
     items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return items;
+  }
+
+  void _requirePassword(String password) {
+    if (password.length < 8 || password.contains(' ')) {
+      throw ClinicException('Use a password of at least 8 characters.');
+    }
+  }
+
+  Future<void> _syncLogin({
+    required String previousEmail,
+    required String email,
+    required String name,
+    required UserRole role,
+    required String password,
+    int? patientId,
+    String? doctorId,
+  }) async {
+    final next = email.trim().toLowerCase();
+    final previous = previousEmail.trim().toLowerCase();
+    if (password.isNotEmpty) _requirePassword(password);
+    final current = previous.isEmpty ? null : await userByEmail(previous);
+    final taken = await userByEmail(next);
+    final samePerson = current != null && taken?.email == current.email;
+    if (taken != null && !samePerson) {
+      throw ClinicException('This email already has a login.');
+    }
+    if (current == null && password.isEmpty) {
+      throw ClinicException('Set a password so they can sign in.');
+    }
+    final user = ClinicUser(
+      email: next,
+      name: name.trim(),
+      role: role,
+      passwordHash: password.isEmpty
+          ? current!.passwordHash
+          : hashPassword(password),
+      patientId: patientId,
+      doctorId: role == UserRole.doctor
+          ? (doctorId ?? current?.doctorId)
+          : doctorId,
+    );
+    if (previous.isNotEmpty && previous != next) {
+      await _users.record(previous).delete(_db);
+      await _rewriteLoginEmail(previous, next);
+    }
+    await _users.record(next).put(_db, user.toJson());
+  }
+
+  Future<void> _rewriteLoginEmail(String from, String to) async {
+    final conversations = await _conversations.find(_db);
+    for (final record in conversations) {
+      final item = Conversation.fromJson(record.value);
+      final patientEmail = item.patientEmail.toLowerCase() == from
+          ? to
+          : item.patientEmail;
+      final doctorEmail = item.doctorEmail.toLowerCase() == from
+          ? to
+          : item.doctorEmail;
+      if (patientEmail == item.patientEmail &&
+          doctorEmail == item.doctorEmail) {
+        continue;
+      }
+      await _conversations
+          .record(item.id)
+          .put(
+            _db,
+            Conversation(
+              id: item.id,
+              patientId: item.patientId,
+              doctorId: item.doctorId,
+              patientEmail: patientEmail,
+              doctorEmail: doctorEmail,
+            ).toJson(),
+          );
+    }
+    final messages = await _messages.find(_db);
+    for (final record in messages) {
+      final message = ChatMessage.fromJson(record.value);
+      final sender = message.senderId.toLowerCase() == from
+          ? to
+          : message.senderId;
+      final receiver = message.receiverId.toLowerCase() == from
+          ? to
+          : message.receiverId;
+      if (sender == message.senderId && receiver == message.receiverId) {
+        continue;
+      }
+      await _messages
+          .record(message.id)
+          .put(
+            _db,
+            ChatMessage(
+              id: message.id,
+              conversationId: message.conversationId,
+              senderId: sender,
+              receiverId: receiver,
+              text: message.text,
+              createdAt: message.createdAt,
+              deliveryStatus: message.deliveryStatus,
+              readAt: message.readAt,
+            ).toJson(),
+          );
+    }
+  }
+
+  Future<ClinicUser?> _userForDoctor(String doctorId) async {
+    final records = await _users.find(_db);
+    for (final record in records) {
+      final user = ClinicUser.fromJson(record.value);
+      if (user.role == UserRole.doctor && user.doctorId == doctorId) {
+        return user;
+      }
+    }
+    return null;
   }
 
   Future<ClinicUser?> _userForPatient(int patientId) async {

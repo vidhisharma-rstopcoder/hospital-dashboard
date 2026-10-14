@@ -58,6 +58,28 @@ String? feeRule(String? value) {
   return nonNegativeIntRule(value, 'Consultation fee', max: 999999);
 }
 
+String? passwordRule(String? value, {bool required = true}) {
+  final password = value ?? '';
+  if (password.isEmpty) {
+    return required ? 'Enter a password.' : null;
+  }
+  if (password.contains(' ')) return 'Password cannot contain spaces.';
+  if (password.length < 8) return 'Use at least 8 characters.';
+  return null;
+}
+
+String? confirmPasswordRule(
+  String? value,
+  String password, {
+  bool required = true,
+}) {
+  final confirm = value ?? '';
+  if (password.isEmpty && confirm.isEmpty && !required) return null;
+  if (confirm.isEmpty) return 'Confirm the password.';
+  if (confirm != password) return 'Passwords do not match.';
+  return null;
+}
+
 String? patientFormError({
   required String name,
   required String email,
@@ -68,6 +90,9 @@ String? patientFormError({
   required String address,
   required String emergencyName,
   required String emergencyPhone,
+  String password = '',
+  String confirmPassword = '',
+  bool passwordRequired = false,
 }) {
   return personNameRule(name) ??
       emailRule(email) ??
@@ -77,7 +102,13 @@ String? patientFormError({
       requiredText(bloodGroup, 'a blood group') ??
       requiredText(address, 'the address') ??
       personNameRule(emergencyName, label: 'an emergency contact') ??
-      phoneRule(emergencyPhone);
+      phoneRule(emergencyPhone) ??
+      passwordRule(password, required: passwordRequired) ??
+      confirmPasswordRule(
+        confirmPassword,
+        password,
+        required: passwordRequired || password.isNotEmpty,
+      );
 }
 
 String? doctorFormError({
@@ -91,6 +122,9 @@ String? doctorFormError({
   required String fee,
   required List<String> days,
   required List<String> slots,
+  String password = '',
+  String confirmPassword = '',
+  bool passwordRequired = false,
 }) {
   return personNameRule(name) ??
       emailRule(email) ??
@@ -101,5 +135,11 @@ String? doctorFormError({
       requiredText(hospital, 'the hospital or clinic') ??
       feeRule(fee) ??
       (days.isEmpty ? 'Choose at least one available day.' : null) ??
-      (slots.isEmpty ? 'Choose at least one time slot.' : null);
+      (slots.isEmpty ? 'Choose at least one time slot.' : null) ??
+      passwordRule(password, required: passwordRequired) ??
+      confirmPasswordRule(
+        confirmPassword,
+        password,
+        required: passwordRequired || password.isNotEmpty,
+      );
 }

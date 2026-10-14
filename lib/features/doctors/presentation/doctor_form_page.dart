@@ -28,6 +28,8 @@ class _DoctorFormPageState extends ConsumerState<DoctorFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _email = TextEditingController();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
   final _phone = TextEditingController();
   final _qualification = TextEditingController();
   final _years = TextEditingController();
@@ -40,9 +42,13 @@ class _DoctorFormPageState extends ConsumerState<DoctorFormPage> {
   String _photo = '';
   var _loading = true;
   var _saving = false;
+  var _hidePassword = true;
+  var _hasLogin = false;
   String? _error;
 
   bool get _editing => widget.doctorId != null;
+
+  bool get _passwordRequired => !_editing || !_hasLogin;
 
   @override
   void initState() {
@@ -55,6 +61,8 @@ class _DoctorFormPageState extends ConsumerState<DoctorFormPage> {
     for (final controller in [
       _name,
       _email,
+      _password,
+      _confirm,
       _phone,
       _qualification,
       _years,
@@ -80,7 +88,12 @@ class _DoctorFormPageState extends ConsumerState<DoctorFormPage> {
         ref.read(authControllerProvider).actor,
         id,
       );
+      final login = await store.userByEmail(doctor.email);
       if (!mounted) return;
+      _hasLogin =
+          login != null &&
+          login.role == UserRole.doctor &&
+          login.doctorId == id;
       _name.text = doctor.name;
       _email.text = doctor.email;
       _phone.text = doctor.phone;
@@ -129,6 +142,9 @@ class _DoctorFormPageState extends ConsumerState<DoctorFormPage> {
       fee: _fee.text,
       days: _daysSelected.toList(),
       slots: _slotsSelected.toList(),
+      password: _password.text,
+      confirmPassword: _confirm.text,
+      passwordRequired: _passwordRequired,
     );
     if (!(_formKey.currentState?.validate() ?? false) || message != null) {
       setState(() => _error = message);
@@ -157,12 +173,16 @@ class _DoctorFormPageState extends ConsumerState<DoctorFormPage> {
         photoDataUrl: _photo,
       );
       final saved = _editing
-          ? await store.updateDoctor(actor, draft)
-          : await store.createDoctor(actor, draft);
+          ? await store.updateDoctor(actor, draft, password: _password.text)
+          : await store.createDoctor(actor, draft, password: _password.text);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_editing ? 'Doctor updated.' : 'Doctor registered.'),
+          content: Text(
+            _editing
+                ? 'Doctor updated.'
+                : 'Doctor registered. They can sign in with this email.',
+          ),
         ),
       );
       context.go('/doctors/${saved.id}');
@@ -199,6 +219,13 @@ class _DoctorFormPageState extends ConsumerState<DoctorFormPage> {
                 Text(
                   _editing ? 'Edit doctor' : 'Register doctor',
                   style: AppType.title,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _passwordRequired
+                      ? 'Set a password. They sign in with this email and chat with assigned patients.'
+                      : 'Leave the password blank to keep the current one.',
+                  style: AppType.body,
                 ),
                 const SizedBox(height: 16),
                 if (_error != null)
@@ -239,6 +266,50 @@ class _DoctorFormPageState extends ConsumerState<DoctorFormPage> {
                   inputFormatters: emailFormatters,
                   decoration: const InputDecoration(labelText: 'Email'),
                   validator: emailRule,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _password,
+                  obscureText: _hidePassword,
+                  keyboardType: TextInputType.visiblePassword,
+                  textInputAction: TextInputAction.next,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  decoration: InputDecoration(
+                    labelText: _passwordRequired ? 'Password' : 'New password',
+                    helperText: 'At least 8 characters',
+                    suffixIcon: IconButton(
+                      tooltip: _hidePassword
+                          ? 'Show password'
+                          : 'Hide password',
+                      onPressed: () =>
+                          setState(() => _hidePassword = !_hidePassword),
+                      icon: Icon(
+                        _hidePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                  validator: (value) =>
+                      passwordRule(value, required: _passwordRequired),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _confirm,
+                  obscureText: _hidePassword,
+                  keyboardType: TextInputType.visiblePassword,
+                  textInputAction: TextInputAction.next,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirm password',
+                  ),
+                  validator: (value) => confirmPasswordRule(
+                    value,
+                    _password.text,
+                    required: _passwordRequired || _password.text.isNotEmpty,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

@@ -51,6 +51,11 @@ void main() {
       phone = formatter.formatEditUpdate(TextEditingValue.empty, phone);
     }
     expect(phone.text, '9876543210');
+    expect(passwordRule('short'), 'Use at least 8 characters.');
+    expect(
+      confirmPasswordRule('Meera1234', 'Other1234'),
+      'Passwords do not match.',
+    );
     expect(
       dateOfBirthRule(DateTime(2999, 1, 1), today: DateTime(2026, 10, 14)),
       'Date of birth cannot be in the future.',
@@ -135,7 +140,14 @@ void main() {
         emergencyContactName: 'Asha Joshi',
         emergencyContactPhone: '9876511111',
       ),
+      password: 'Meera1234',
     );
+    final meeraLogin = await store.authenticate(
+      'meera@cityhospital.org',
+      'Meera1234',
+    );
+    expect(meeraLogin.role, UserRole.patient);
+    expect(meeraLogin.patientId, created.id);
     expect(created.id, greaterThan(123));
     expect(
       (await store.getPatient(adminActor, created.id)).name,
@@ -221,6 +233,108 @@ void main() {
 
     final again = await store.getPatient(adminActor, created.id);
     expect(again.name, 'Meera Joshi');
+    await store.close();
+  });
+
+  test('a registered patient and doctor can sign in and chat', () async {
+    final database = await databaseFactoryMemory.openDatabase('clinic-chat');
+    final store = await ClinicStore.open(database: database);
+    final admin = await store.authenticate(
+      'admin@cityhospital.org',
+      AuthRepository.demoPassword,
+    );
+    final adminActor = Actor(role: admin.role, email: admin.email);
+    final patient = await store.createPatient(
+      adminActor,
+      Patient(
+        id: 0,
+        name: 'Aisha Khan',
+        gender: 'Female',
+        dateOfBirth: DateTime(1995, 4, 4),
+        admissionDate: DateTime(2026, 10, 14),
+        status: PatientStatus.admitted,
+        phone: '9876501234',
+        email: 'aisha@cityhospital.org',
+        address: 'Pune',
+        bloodGroup: 'A+',
+        emergencyContactName: 'Imran Khan',
+        emergencyContactPhone: '9876502222',
+      ),
+      password: 'Patient123',
+    );
+    final doctor = await store.createDoctor(
+      adminActor,
+      const Doctor(
+        id: '',
+        name: 'Riya Sen',
+        email: 'riya@cityhospital.org',
+        phone: '9812345678',
+        specialization: 'General Medicine',
+        qualification: 'MBBS',
+        yearsExperience: 6,
+        hospital: 'City Hospital',
+        consultationFee: 500,
+        availableDays: ['Mon'],
+        timeSlots: ['Morning'],
+        bio: 'Ward rounds.',
+      ),
+      password: 'Doctor1234',
+    );
+    await store.assignDoctor(
+      adminActor,
+      patientId: patient.id,
+      doctorId: doctor.id,
+    );
+
+    final patientUser = await store.authenticate(
+      'aisha@cityhospital.org',
+      'Patient123',
+    );
+    final doctorUser = await store.authenticate(
+      'riya@cityhospital.org',
+      'Doctor1234',
+    );
+    expect(patientUser.doctorId, doctor.id);
+    expect(doctorUser.doctorId, doctor.id);
+    expect(
+      store.authenticate('aisha@cityhospital.org', 'wrong-pass'),
+      throwsA(isA<AuthException>()),
+    );
+
+    final patientActor = Actor(
+      role: patientUser.role,
+      email: patientUser.email,
+      patientId: patientUser.patientId,
+      doctorId: patientUser.doctorId,
+    );
+    final doctorActor = Actor(
+      role: doctorUser.role,
+      email: doctorUser.email,
+      doctorId: doctorUser.doctorId,
+    );
+    final conversation = await store.openConversation(
+      patientActor,
+      patientId: patient.id,
+      doctorId: doctor.id,
+    );
+    await store.sendMessage(
+      patientActor,
+      conversationId: conversation.id,
+      text: 'Hello doctor',
+    );
+    await store.sendMessage(
+      doctorActor,
+      conversationId: conversation.id,
+      text: 'Hello, I am here',
+    );
+    final messages = await store
+        .watchMessages(doctorActor, conversation.id)
+        .first;
+    expect(messages.map((message) => message.text), [
+      'Hello doctor',
+      'Hello, I am here',
+    ]);
+    expect(await store.unreadMessages(doctorActor), 1);
     await store.close();
   });
 }

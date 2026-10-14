@@ -26,6 +26,8 @@ class _PatientFormPageState extends ConsumerState<PatientFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _email = TextEditingController();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
   final _phone = TextEditingController();
   final _address = TextEditingController();
   final _history = TextEditingController();
@@ -40,9 +42,13 @@ class _PatientFormPageState extends ConsumerState<PatientFormPage> {
   String? _doctorId;
   var _loading = true;
   var _saving = false;
+  var _hidePassword = true;
+  var _hasLogin = false;
   String? _error;
 
   bool get _editing => widget.patientId != null;
+
+  bool get _passwordRequired => !_editing || !_hasLogin;
 
   @override
   void initState() {
@@ -55,6 +61,8 @@ class _PatientFormPageState extends ConsumerState<PatientFormPage> {
     for (final controller in [
       _name,
       _email,
+      _password,
+      _confirm,
       _phone,
       _address,
       _history,
@@ -81,7 +89,12 @@ class _PatientFormPageState extends ConsumerState<PatientFormPage> {
         id,
       );
       final rel = await store.activeRelationship(id);
+      final login = await store.userByEmail(patient.email);
       if (!mounted) return;
+      _hasLogin =
+          login != null &&
+          login.role == UserRole.patient &&
+          login.patientId == id;
       _name.text = patient.name;
       _email.text = patient.email;
       _phone.text = patient.phone;
@@ -129,6 +142,9 @@ class _PatientFormPageState extends ConsumerState<PatientFormPage> {
       address: _address.text,
       emergencyName: _emergencyName.text,
       emergencyPhone: _emergencyPhone.text,
+      password: _password.text,
+      confirmPassword: _confirm.text,
+      passwordRequired: _passwordRequired,
     );
     if (!(_formKey.currentState?.validate() ?? false) || message != null) {
       setState(() => _error = message);
@@ -159,8 +175,8 @@ class _PatientFormPageState extends ConsumerState<PatientFormPage> {
         medications: _medications.text,
       );
       final saved = _editing
-          ? await store.updatePatient(actor, draft)
-          : await store.createPatient(actor, draft);
+          ? await store.updatePatient(actor, draft, password: _password.text)
+          : await store.createPatient(actor, draft, password: _password.text);
       if (!_editing && _doctorId != null && _doctorId!.isNotEmpty) {
         await store.assignDoctor(
           actor,
@@ -171,7 +187,11 @@ class _PatientFormPageState extends ConsumerState<PatientFormPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_editing ? 'Patient updated.' : 'Patient registered.'),
+          content: Text(
+            _editing
+                ? 'Patient updated.'
+                : 'Patient registered. They can sign in with this email.',
+          ),
         ),
       );
       context.go('/patients/${saved.id}');
@@ -215,8 +235,10 @@ class _PatientFormPageState extends ConsumerState<PatientFormPage> {
                     style: AppType.title,
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Required fields are checked before the record is saved.',
+                  Text(
+                    _passwordRequired
+                        ? 'Set a password. They sign in with this email and chat with their doctor.'
+                        : 'Leave the password blank to keep the current one.',
                     style: AppType.body,
                   ),
                   const SizedBox(height: 16),
@@ -247,6 +269,52 @@ class _PatientFormPageState extends ConsumerState<PatientFormPage> {
                     inputFormatters: emailFormatters,
                     decoration: const InputDecoration(labelText: 'Email'),
                     validator: emailRule,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _password,
+                    obscureText: _hidePassword,
+                    keyboardType: TextInputType.visiblePassword,
+                    textInputAction: TextInputAction.next,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    decoration: InputDecoration(
+                      labelText: _passwordRequired
+                          ? 'Password'
+                          : 'New password',
+                      helperText: 'At least 8 characters',
+                      suffixIcon: IconButton(
+                        tooltip: _hidePassword
+                            ? 'Show password'
+                            : 'Hide password',
+                        onPressed: () =>
+                            setState(() => _hidePassword = !_hidePassword),
+                        icon: Icon(
+                          _hidePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
+                    ),
+                    validator: (value) =>
+                        passwordRule(value, required: _passwordRequired),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _confirm,
+                    obscureText: _hidePassword,
+                    keyboardType: TextInputType.visiblePassword,
+                    textInputAction: TextInputAction.next,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm password',
+                    ),
+                    validator: (value) => confirmPasswordRule(
+                      value,
+                      _password.text,
+                      required: _passwordRequired || _password.text.isNotEmpty,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
