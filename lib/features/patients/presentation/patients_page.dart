@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hospital_dashboard/theme/app_colors.dart';
 import 'package:hospital_dashboard/theme/app_theme.dart';
+import 'package:hospital_dashboard/features/auth/presentation/auth_controller.dart';
+import 'package:hospital_dashboard/features/clinic/domain/clinic_models.dart';
 import 'package:hospital_dashboard/common/widgets/entrance.dart';
 import 'package:hospital_dashboard/common/widgets/shimmer_box.dart';
 import 'package:hospital_dashboard/common/widgets/state_message.dart';
@@ -103,6 +105,14 @@ class _PatientsPageState extends ConsumerState<PatientsPage> {
                     ],
                   ),
                 ),
+                if (ref.watch(authControllerProvider).role == UserRole.admin)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilledButton(
+                      onPressed: () => context.go('/patients/new'),
+                      child: const Text('Add patient'),
+                    ),
+                  ),
                 if (total != null) _TotalPill(total: total),
               ],
             ),
@@ -284,7 +294,11 @@ class _StatusFilters extends StatelessWidget {
         children: [
           for (final option in options) ...[
             _StatusChipButton(
-              label: option == 'All' ? 'All' : option,
+              label: option == 'All'
+                  ? 'All'
+                  : option == 'Observation'
+                  ? 'Under Observation'
+                  : option,
               selected: selected == option,
               onTap: () => onSelected(option),
             ),

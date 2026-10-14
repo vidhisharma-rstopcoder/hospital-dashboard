@@ -10,6 +10,9 @@ enum PatientStatus {
 
   final String label;
 
+  String get displayLabel =>
+      this == PatientStatus.observation ? 'Under Observation' : label;
+
   bool get inCare => this != PatientStatus.discharged;
 
   static PatientStatus parse(String raw) {
@@ -25,7 +28,9 @@ enum PatientStatus {
     final value = raw.trim().toLowerCase();
     if (value.isEmpty || value == 'all') return null;
     for (final status in PatientStatus.values) {
-      if (status.label.toLowerCase() == value || status.name == value) {
+      if (status.label.toLowerCase() == value ||
+          status.displayLabel.toLowerCase() == value ||
+          status.name == value) {
         return status;
       }
     }

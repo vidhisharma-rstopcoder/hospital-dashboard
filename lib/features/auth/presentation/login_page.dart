@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hospital_dashboard/common/widgets/entrance.dart';
 import 'package:hospital_dashboard/common/widgets/glass_panel.dart';
 import 'package:hospital_dashboard/common/widgets/hospital_logo.dart';
+import 'package:hospital_dashboard/common/widgets/hospital_scene.dart';
 import 'package:hospital_dashboard/common/widgets/mesh_backdrop.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hospital_dashboard/features/auth/data/auth_repository.dart';
 import 'package:hospital_dashboard/features/auth/presentation/auth_controller.dart';
 import 'package:hospital_dashboard/theme/app_colors.dart';
@@ -24,6 +26,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _password = TextEditingController();
   var _submitted = false;
   var _obscure = true;
+  var _remember = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberedEmail();
+  }
+
+  Future<void> _loadRememberedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('cityhospital.remember.email');
+    if (!mounted || saved == null || saved.isEmpty) return;
+    setState(() {
+      _email.text = saved;
+      _remember = true;
+    });
+  }
 
   @override
   void dispose() {
@@ -36,13 +55,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     FocusScope.of(context).unfocus();
     setState(() => _submitted = true);
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    await ref
+    final signedIn = await ref
         .read(authControllerProvider.notifier)
         .signIn(_email.text, _password.text);
+    if (!signedIn || !mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (_remember) {
+      await prefs.setString(
+        'cityhospital.remember.email',
+        _email.text.trim().toLowerCase(),
+      );
+    } else {
+      await prefs.remove('cityhospital.remember.email');
+    }
   }
 
-  void _useDemo() {
-    _email.text = AuthRepository.demoEmail;
+  void _useDemo(String email) {
+    _email.text = email;
     _password.text = AuthRepository.demoPassword;
     ref.read(authControllerProvider.notifier).clearError();
     setState(() => _submitted = false);
@@ -67,6 +96,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             onToggleObscure: () => setState(() => _obscure = !_obscure),
             onSubmit: _submit,
             onUseDemo: _useDemo,
+            remember: _remember,
+            onRemember: (value) => setState(() => _remember = value),
             onEdited: () =>
                 ref.read(authControllerProvider.notifier).clearError(),
           );
@@ -142,6 +173,8 @@ class _LoginForm extends StatelessWidget {
     required this.onToggleObscure,
     required this.onSubmit,
     required this.onUseDemo,
+    required this.remember,
+    required this.onRemember,
     required this.onEdited,
   });
 
@@ -154,7 +187,9 @@ class _LoginForm extends StatelessWidget {
   final String? errorMessage;
   final VoidCallback onToggleObscure;
   final VoidCallback onSubmit;
-  final VoidCallback onUseDemo;
+  final ValueChanged<String> onUseDemo;
+  final bool remember;
+  final ValueChanged<bool> onRemember;
   final VoidCallback onEdited;
 
   @override
@@ -169,7 +204,7 @@ class _LoginForm extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Staff sign in',
+              'Welcome back',
               style: TextStyle(
                 fontSize: 34,
                 fontWeight: FontWeight.w700,
@@ -179,7 +214,7 @@ class _LoginForm extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Ward email and password.',
+              'Sign in to the hospital desk.',
               style: TextStyle(
                 color: AppColors.muted,
                 fontSize: 15.5,
@@ -251,7 +286,41 @@ class _LoginForm extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Checkbox(
+                  value: remember,
+                  onChanged: (value) => onRemember(value ?? false),
+                ),
+                const Text(
+                  'Remember me',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () {
+                    showDialog<void>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Password reset'),
+                        content: const Text(
+                          'This desk does not send reset mail. Use the shared demonstration password Ward1234, or ask an administrator.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  child: const Text('Forgot password?'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             _SignInButton(submitting: submitting, onPressed: onSubmit),
             const SizedBox(height: 16),
             const Text(
@@ -310,7 +379,7 @@ class _SignInButtonState extends State<_SignInButton> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               gradient: const LinearGradient(
-                colors: [Color(0xFF4338CA), AppColors.teal],
+                colors: [Color(0xFF38BDF8), AppColors.teal],
               ),
               boxShadow: [
                 BoxShadow(
@@ -363,7 +432,7 @@ class _SignInButtonState extends State<_SignInButton> {
 class _DemoCard extends StatelessWidget {
   const _DemoCard({required this.onUseDemo});
 
-  final VoidCallback onUseDemo;
+  final ValueChanged<String> onUseDemo;
 
   @override
   Widget build(BuildContext context) {
@@ -375,31 +444,37 @@ class _DemoCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DDFC)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.key_rounded, color: AppColors.teal),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Test account',
+          const Row(
+            children: [
+              Icon(Icons.key_rounded, color: AppColors.teal),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Test accounts · password Ward1234',
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
-                SizedBox(height: 2),
-                Text(
-                  'doctor@cityhospital.org  /  Ward1234',
-                  style: TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          TextButton(onPressed: onUseDemo, child: const Text('Fill')),
+          Wrap(
+            children: [
+              TextButton(
+                onPressed: () => onUseDemo('admin@cityhospital.org'),
+                child: const Text('Admin'),
+              ),
+              TextButton(
+                onPressed: () => onUseDemo(AuthRepository.demoEmail),
+                child: const Text('Doctor'),
+              ),
+              TextButton(
+                onPressed: () => onUseDemo('patient@cityhospital.org'),
+                child: const Text('Patient'),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -412,11 +487,11 @@ class _CompactBrand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const SizedBox(
-      height: 168,
+      height: 220,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          MeshBackdrop(dark: true),
+          HospitalScene(),
           SafeArea(
             bottom: false,
             child: Padding(
@@ -433,7 +508,7 @@ class _CompactBrand extends StatelessWidget {
                         Text(
                           'Rounds',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: AppColors.ink,
                             fontWeight: FontWeight.w700,
                             fontSize: 18,
                             letterSpacing: -0.3,
@@ -443,7 +518,7 @@ class _CompactBrand extends StatelessWidget {
                         Text(
                           'City Hospital',
                           style: TextStyle(
-                            color: Color(0xFFC7CDD8),
+                            color: AppColors.muted,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -468,9 +543,9 @@ class _BrandPanel extends StatelessWidget {
     return const Stack(
       fit: StackFit.expand,
       children: [
-        MeshBackdrop(dark: true),
+        HospitalScene(),
         Padding(
-          padding: EdgeInsets.all(48),
+          padding: EdgeInsets.all(36),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -478,86 +553,34 @@ class _BrandPanel extends StatelessWidget {
                 children: [
                   HospitalLogo(size: 40),
                   SizedBox(width: 12),
-                  Text(
-                    'Rounds',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      letterSpacing: -0.2,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Rounds',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      Text(
+                        'City Hospital',
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-              Spacer(),
-              Text(
-                'Rounds',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 44,
-                  height: 1.02,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -1.2,
-                ),
-              ),
-              SizedBox(height: 16),
-              SizedBox(
-                width: 420,
-                child: Text(
-                  'Who was admitted, who is still here, and who went home.',
-                  style: TextStyle(
-                    color: Color(0xFFD5DBE6),
-                    fontSize: 16,
-                    height: 1.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              SizedBox(height: 28),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _SideNote(text: 'General medicine'),
-                  _SideNote(text: 'ICU'),
-                  _SideNote(text: 'Cardiology'),
-                ],
-              ),
-              Spacer(),
-              Text(
-                '12 Lake Road, Pune  ·  Staff only',
-                style: TextStyle(
-                  color: Color(0xFF9AA3B2),
-                  fontWeight: FontWeight.w600,
-                ),
               ),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _SideNote extends StatelessWidget {
-  const _SideNote({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassPanel(
-      dark: true,
-      radius: 999,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-        ),
-      ),
     );
   }
 }

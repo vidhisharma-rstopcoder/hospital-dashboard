@@ -20,6 +20,9 @@ class Patient {
     this.emergencyContactName = '',
     this.emergencyContactPhone = '',
     this.insuranceProvider = '',
+    this.medicalHistory = '',
+    this.allergies = '',
+    this.medications = '',
   });
 
   final int id;
@@ -39,6 +42,9 @@ class Patient {
   final String emergencyContactName;
   final String emergencyContactPhone;
   final String insuranceProvider;
+  final String medicalHistory;
+  final String allergies;
+  final String medications;
 
   int ageOn(DateTime day) {
     final today = DateTime(day.year, day.month, day.day);
@@ -82,6 +88,87 @@ class Patient {
       emergencyContactName: _text(json['emergency_contact_name']),
       emergencyContactPhone: _text(json['emergency_contact_phone']),
       insuranceProvider: _text(json['insurance_provider']),
+      medicalHistory: _text(json['medical_history']),
+      allergies: _text(json['allergies']),
+      medications: _text(json['medications']),
+    );
+  }
+
+  Map<String, Object?> toJson() {
+    String day(DateTime value) {
+      final local = DateTime(value.year, value.month, value.day);
+      final month = local.month.toString().padLeft(2, '0');
+      final date = local.day.toString().padLeft(2, '0');
+      return '${local.year}-$month-$date';
+    }
+
+    return {
+      'id': id,
+      'name': name,
+      'gender': gender,
+      'date_of_birth': day(dateOfBirth),
+      'admission_date': day(admissionDate),
+      'status': status.label,
+      'phone': phone,
+      'email': email,
+      'address': address,
+      'blood_group': bloodGroup,
+      'ward': ward,
+      'room': room,
+      'attending_doctor': attendingDoctor,
+      'diagnosis': diagnosis,
+      'emergency_contact_name': emergencyContactName,
+      'emergency_contact_phone': emergencyContactPhone,
+      'insurance_provider': insuranceProvider,
+      'medical_history': medicalHistory,
+      'allergies': allergies,
+      'medications': medications,
+    };
+  }
+
+  Patient copyWith({
+    String? name,
+    String? gender,
+    DateTime? dateOfBirth,
+    DateTime? admissionDate,
+    PatientStatus? status,
+    String? phone,
+    String? email,
+    String? address,
+    String? bloodGroup,
+    String? ward,
+    String? room,
+    String? attendingDoctor,
+    String? diagnosis,
+    String? emergencyContactName,
+    String? emergencyContactPhone,
+    String? insuranceProvider,
+    String? medicalHistory,
+    String? allergies,
+    String? medications,
+  }) {
+    return Patient(
+      id: id,
+      name: name ?? this.name,
+      gender: gender ?? this.gender,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      admissionDate: admissionDate ?? this.admissionDate,
+      status: status ?? this.status,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      address: address ?? this.address,
+      bloodGroup: bloodGroup ?? this.bloodGroup,
+      ward: ward ?? this.ward,
+      room: room ?? this.room,
+      attendingDoctor: attendingDoctor ?? this.attendingDoctor,
+      diagnosis: diagnosis ?? this.diagnosis,
+      emergencyContactName: emergencyContactName ?? this.emergencyContactName,
+      emergencyContactPhone:
+          emergencyContactPhone ?? this.emergencyContactPhone,
+      insuranceProvider: insuranceProvider ?? this.insuranceProvider,
+      medicalHistory: medicalHistory ?? this.medicalHistory,
+      allergies: allergies ?? this.allergies,
+      medications: medications ?? this.medications,
     );
   }
 

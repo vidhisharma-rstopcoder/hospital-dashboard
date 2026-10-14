@@ -30,9 +30,9 @@ class AdmissionCharts extends StatelessWidget {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(flex: 4, child: statusCard),
-            const SizedBox(width: 16),
             Expanded(flex: 6, child: weekCard),
+            const SizedBox(width: 16),
+            Expanded(flex: 4, child: statusCard),
           ],
         );
       },
@@ -64,7 +64,7 @@ class _StatusMix extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Patients by status',
+            'Patient status',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 4),
@@ -159,7 +159,7 @@ class _WeekChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Admissions this week',
+            'Patient overview',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 4),
@@ -173,11 +173,10 @@ class _WeekChart extends StatelessWidget {
           const SizedBox(height: 18),
           SizedBox(
             height: 220,
-            child: BarChart(
-              BarChartData(
+            child: LineChart(
+              LineChartData(
                 maxY: maxY,
                 minY: 0,
-                alignment: BarChartAlignment.spaceAround,
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
@@ -186,20 +185,21 @@ class _WeekChart extends StatelessWidget {
                       const FlLine(color: AppColors.line, strokeWidth: 1),
                 ),
                 borderData: FlBorderData(show: false),
-                barTouchData: BarTouchData(
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (group) => AppColors.ink,
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      final count = rod.toY.toInt();
-                      final noun = count == 1 ? 'admission' : 'admissions';
-                      return BarTooltipItem(
-                        '$count $noun',
-                        const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: appFontFamily,
-                        ),
-                      );
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (spot) => AppColors.ink,
+                    getTooltipItems: (spots) {
+                      return [
+                        for (final spot in spots)
+                          LineTooltipItem(
+                            '${spot.y.toInt()} ${spot.y.toInt() == 1 ? 'admission' : 'admissions'}',
+                            const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: appFontFamily,
+                            ),
+                          ),
+                      ];
                     },
                   ),
                 ),
@@ -252,25 +252,21 @@ class _WeekChart extends StatelessWidget {
                     ),
                   ),
                 ),
-                barGroups: [
-                  for (var i = 0; i < stats.weekCounts.length; i++)
-                    BarChartGroupData(
-                      x: i,
-                      barRods: [
-                        BarChartRodData(
-                          toY: stats.weekCounts[i].toDouble(),
-                          width: 18,
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(8),
-                          ),
-                          gradient: const LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [AppColors.teal, Color(0xFFA5B4FC)],
-                          ),
-                        ),
-                      ],
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: [
+                      for (var i = 0; i < stats.weekCounts.length; i++)
+                        FlSpot(i.toDouble(), stats.weekCounts[i].toDouble()),
+                    ],
+                    isCurved: true,
+                    color: AppColors.teal,
+                    barWidth: 3,
+                    dotData: const FlDotData(show: true),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: AppColors.teal.withValues(alpha: 0.12),
                     ),
+                  ),
                 ],
               ),
               duration: const Duration(milliseconds: 700),
@@ -333,7 +329,7 @@ class _StatusRowState extends State<_StatusRow> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    widget.status.label,
+                    widget.status.displayLabel,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,

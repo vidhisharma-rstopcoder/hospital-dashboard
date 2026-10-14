@@ -37,7 +37,7 @@ class StatusChip extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            status.label,
+            status.displayLabel,
             style: TextStyle(
               color: color,
               fontFamily: appFontFamily,

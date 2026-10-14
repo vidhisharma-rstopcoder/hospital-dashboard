@@ -8,6 +8,9 @@ import 'package:hospital_dashboard/common/widgets/shimmer_box.dart';
 import 'package:hospital_dashboard/common/widgets/state_message.dart';
 import 'package:hospital_dashboard/common/widgets/status_chip.dart';
 import 'package:hospital_dashboard/common/widgets/surface_card.dart';
+import 'package:hospital_dashboard/features/auth/presentation/auth_controller.dart';
+import 'package:hospital_dashboard/features/clinic/data/clinic_store.dart';
+import 'package:hospital_dashboard/features/clinic/domain/clinic_models.dart';
 import 'package:hospital_dashboard/features/patients/domain/patient.dart';
 import 'package:hospital_dashboard/features/patients/domain/patient_status.dart';
 import 'package:hospital_dashboard/features/patients/domain/patient_exception.dart';
@@ -47,13 +50,21 @@ class PatientDetailsPage extends ConsumerWidget {
   }
 }
 
-class _DetailsBody extends StatelessWidget {
+class _DetailsBody extends StatefulWidget {
   const _DetailsBody({required this.patient});
 
   final Patient patient;
 
   @override
+  State<_DetailsBody> createState() => _DetailsBodyState();
+}
+
+class _DetailsBodyState extends State<_DetailsBody> {
+  var _history = false;
+
+  @override
   Widget build(BuildContext context) {
+    final patient = widget.patient;
     final now = DateTime.now();
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -108,23 +119,64 @@ class _DetailsBody extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextButton.icon(
-                    onPressed: () {
-                      if (context.canPop()) {
-                        context.pop();
-                      } else {
-                        context.go('/patients');
-                      }
-                    },
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    label: const Text('Patients'),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 4,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go('/patients');
+                          }
+                        },
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        label: const Text('Patients'),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, size: 18),
+                      Text(
+                        patient.name,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Entrance(
                     child: _Hero(patient: patient, now: now),
                   ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                        value: false,
+                        label: Text('Overview'),
+                        icon: Icon(Icons.person_outline_rounded),
+                      ),
+                      ButtonSegment(
+                        value: true,
+                        label: Text('Medical history'),
+                        icon: Icon(Icons.history_rounded),
+                      ),
+                    ],
+                    selected: {_history},
+                    onSelectionChanged: (value) =>
+                        setState(() => _history = value.first),
+                  ),
                   const SizedBox(height: 16),
-                  if (wide)
+                  if (_history)
+                    _InfoSection(
+                      title: 'Medical history',
+                      rows: [
+                        _Fact(
+                          'Medical history',
+                          displayText(patient.medicalHistory),
+                        ),
+                        _Fact('Allergies', displayText(patient.allergies)),
+                        _Fact('Medications', displayText(patient.medications)),
+                      ],
+                    )
+                  else if (wide)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -138,21 +190,25 @@ class _DetailsBody extends StatelessWidget {
                     const SizedBox(height: 16),
                     contact,
                   ],
-                  const SizedBox(height: 16),
-                  if (wide)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(flex: 3, child: admission),
-                        const SizedBox(width: 16),
-                        Expanded(flex: 2, child: status),
-                      ],
-                    )
-                  else ...[
-                    admission,
+                  if (!_history) ...[
                     const SizedBox(height: 16),
-                    status,
+                    if (wide)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(flex: 3, child: admission),
+                          const SizedBox(width: 16),
+                          Expanded(flex: 2, child: status),
+                        ],
+                      )
+                    else ...[
+                      admission,
+                      const SizedBox(height: 16),
+                      status,
+                    ],
                   ],
+                  const SizedBox(height: 16),
+                  _RecordActions(patient: patient),
                 ],
               ),
             ),
@@ -340,6 +396,160 @@ class _StatusPanel extends StatelessWidget {
     );
   }
 }
+
+class _RecordActions extends ConsumerStatefulWidget {
+  const _RecordActions({required this.patient});
+
+  final Patient patient;
+
+  @override
+  ConsumerState<_RecordActions> createState() => _RecordActionsState();
+}
+
+class _RecordActionsState extends ConsumerState<_RecordActions> {
+  String? _doctorId;
+  var _busy = false;
+
+  Future<void> _assign(List<Doctor> doctors) async {
+    final id = _doctorId;
+    if (id == null) return;
+    setState(() => _busy = true);
+    try {
+      final store = await ref.read(clinicStoreProvider.future);
+      await store.assignDoctor(
+        ref.read(authControllerProvider).actor,
+        patientId: widget.patient.id,
+        doctorId: id,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Doctor assigned.')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _remove() async {
+    setState(() => _busy = true);
+    try {
+      final store = await ref.read(clinicStoreProvider.future);
+      await store.deletePatient(
+        ref.read(authControllerProvider).actor,
+        widget.patient.id,
+      );
+      if (mounted) context.go('/patients');
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _chat() async {
+    final store = await ref.read(clinicStoreProvider.future);
+    final actor = ref.read(authControllerProvider).actor;
+    final rel = await store.activeRelationship(widget.patient.id);
+    if (rel == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Assign a doctor before chatting.')),
+        );
+      }
+      return;
+    }
+    final conversation = await store.openConversation(
+      actor,
+      patientId: widget.patient.id,
+      doctorId: rel.doctorId,
+    );
+    if (mounted) context.go('/messages/${conversation.id}');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = ref.watch(authControllerProvider);
+    final doctors = ref.watch(_assignableDoctorsProvider);
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Care team',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (auth.role == UserRole.admin)
+                OutlinedButton(
+                  onPressed: () =>
+                      context.go('/patients/${widget.patient.id}/edit'),
+                  child: const Text('Edit record'),
+                ),
+              OutlinedButton(
+                onPressed: _busy ? null : _chat,
+                child: const Text('Open chat'),
+              ),
+              if (auth.role == UserRole.admin)
+                TextButton(
+                  onPressed: _busy ? null : _remove,
+                  child: const Text('Delete'),
+                ),
+            ],
+          ),
+          if (auth.role == UserRole.admin) ...[
+            const SizedBox(height: 12),
+            doctors.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (error, _) => Text(error.toString()),
+              data: (items) => Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _doctorId,
+                      decoration: const InputDecoration(
+                        labelText: 'Assign doctor',
+                      ),
+                      items: [
+                        for (final doctor in items)
+                          DropdownMenuItem(
+                            value: doctor.id,
+                            child: Text(doctor.name),
+                          ),
+                      ],
+                      onChanged: (value) => setState(() => _doctorId = value),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: _busy ? null : () => _assign(items),
+                    child: const Text('Assign'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+final _assignableDoctorsProvider = FutureProvider<List<Doctor>>((ref) async {
+  final store = await ref.watch(clinicStoreProvider.future);
+  return store.listDoctors(ref.watch(authControllerProvider).actor);
+});
 
 class _DetailsSkeleton extends StatelessWidget {
   const _DetailsSkeleton();

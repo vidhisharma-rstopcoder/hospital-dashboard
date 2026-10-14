@@ -24,6 +24,25 @@ class DashboardStats {
   final List<int> weekCounts;
   final List<Patient> recent;
 
+  String shareLabel(PatientStatus? status) {
+    if (total == 0) return '0% of the list';
+    final count = status == null ? total : (byStatus[status] ?? 0);
+    final percent = (count / total * 100).round();
+    return '$percent% of the list';
+  }
+
+  String get todayChange {
+    if (weekCounts.length < 2) return 'Today';
+    final today = weekCounts.last;
+    final yesterday = weekCounts[weekCounts.length - 2];
+    if (yesterday == 0) {
+      return today == 0 ? 'Same as yesterday' : 'First admissions today';
+    }
+    final delta = ((today - yesterday) / yesterday * 100).round();
+    final sign = delta > 0 ? '+' : '';
+    return '$sign$delta% from yesterday';
+  }
+
   String get busiestDay {
     if (weekCounts.isEmpty || weekCounts.every((count) => count == 0)) {
       return 'No admissions this week';

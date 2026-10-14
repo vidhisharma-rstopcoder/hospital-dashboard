@@ -1,5 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hospital_dashboard/config/app_config.dart';
+import 'package:hospital_dashboard/features/auth/presentation/auth_controller.dart';
+import 'package:hospital_dashboard/features/clinic/data/clinic_store.dart';
 import 'package:hospital_dashboard/features/patients/data/patient_providers.dart';
+import 'package:hospital_dashboard/features/patients/domain/patient_exception.dart';
 import 'package:hospital_dashboard/features/patients/domain/patient.dart';
 import 'package:hospital_dashboard/features/patients/domain/patient_page_result.dart';
 import 'package:hospital_dashboard/features/patients/domain/patient_status.dart';
@@ -39,21 +43,50 @@ PatientQuery queryFromUri(Uri uri) {
   );
 }
 
+bool get _useClinicRecords =>
+    AppConfig.useMockApi && !AppConfig.simulateApiError;
+
 final patientListProvider = FutureProvider.autoDispose
-    .family<PatientPageResult, PatientQuery>((ref, query) {
-      return ref
-          .watch(patientRepositoryProvider)
-          .fetchPatients(
-            page: query.page,
-            pageSize: query.pageSize,
-            search: query.search,
-            status: query.status,
-          );
+    .family<PatientPageResult, PatientQuery>((ref, query) async {
+      if (!_useClinicRecords) {
+        return ref
+            .watch(patientRepositoryProvider)
+            .fetchPatients(
+              page: query.page,
+              pageSize: query.pageSize,
+              search: query.search,
+              status: query.status,
+            );
+      }
+      final store = await ref.watch(clinicStoreProvider.future);
+      final auth = ref.watch(authControllerProvider);
+      final subscription = store.changes.listen((_) => ref.invalidateSelf());
+      ref.onDispose(subscription.cancel);
+      if (!auth.authenticated) {
+        throw PatientApiException('Sign in to view patients.');
+      }
+      return store.pagePatients(
+        auth.actor,
+        page: query.page,
+        pageSize: query.pageSize,
+        search: query.search,
+        status: query.status,
+      );
     });
 
 final patientDetailsProvider = FutureProvider.autoDispose.family<Patient, int>((
   ref,
   id,
-) {
-  return ref.watch(patientRepositoryProvider).fetchPatient(id);
+) async {
+  if (!_useClinicRecords) {
+    return ref.watch(patientRepositoryProvider).fetchPatient(id);
+  }
+  final store = await ref.watch(clinicStoreProvider.future);
+  final auth = ref.watch(authControllerProvider);
+  final subscription = store.changes.listen((_) => ref.invalidateSelf());
+  ref.onDispose(subscription.cancel);
+  if (!auth.authenticated) {
+    throw PatientApiException('Sign in to view patients.');
+  }
+  return store.getPatient(auth.actor, id);
 });

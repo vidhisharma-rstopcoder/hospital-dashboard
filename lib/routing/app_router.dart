@@ -10,7 +10,14 @@ import 'package:hospital_dashboard/features/auth/presentation/auth_controller.da
 import 'package:hospital_dashboard/features/auth/presentation/boot_page.dart';
 import 'package:hospital_dashboard/features/auth/presentation/login_page.dart';
 import 'package:hospital_dashboard/features/dashboard/presentation/dashboard_page.dart';
+import 'package:hospital_dashboard/features/appointments/presentation/appointments_page.dart';
+import 'package:hospital_dashboard/features/chat/presentation/messages_page.dart';
+import 'package:hospital_dashboard/features/doctors/presentation/doctor_form_page.dart';
+import 'package:hospital_dashboard/features/doctors/presentation/doctor_profile_page.dart';
+import 'package:hospital_dashboard/features/doctors/presentation/doctors_page.dart';
+import 'package:hospital_dashboard/features/notifications/presentation/notifications_page.dart';
 import 'package:hospital_dashboard/features/patients/presentation/patient_details_page.dart';
+import 'package:hospital_dashboard/features/patients/presentation/patient_form_page.dart';
 import 'package:hospital_dashboard/features/patients/presentation/patients_page.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -52,13 +59,77 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) => _fade(state, const PatientsPage()),
             routes: [
               GoRoute(
+                path: 'new',
+                pageBuilder: (context, state) =>
+                    _fade(state, const PatientFormPage()),
+              ),
+              GoRoute(
                 path: ':id',
                 pageBuilder: (context, state) {
                   final id = int.tryParse(state.pathParameters['id'] ?? '');
                   return _fade(state, PatientDetailsPage(patientId: id));
                 },
+                routes: [
+                  GoRoute(
+                    path: 'edit',
+                    pageBuilder: (context, state) {
+                      final id = int.tryParse(state.pathParameters['id'] ?? '');
+                      return _fade(state, PatientFormPage(patientId: id));
+                    },
+                  ),
+                ],
               ),
             ],
+          ),
+          GoRoute(
+            path: '/doctors',
+            pageBuilder: (context, state) => _fade(state, const DoctorsPage()),
+            routes: [
+              GoRoute(
+                path: 'new',
+                pageBuilder: (context, state) =>
+                    _fade(state, const DoctorFormPage()),
+              ),
+              GoRoute(
+                path: ':id',
+                pageBuilder: (context, state) => _fade(
+                  state,
+                  DoctorProfilePage(doctorId: state.pathParameters['id']),
+                ),
+                routes: [
+                  GoRoute(
+                    path: 'edit',
+                    pageBuilder: (context, state) => _fade(
+                      state,
+                      DoctorFormPage(doctorId: state.pathParameters['id']),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          GoRoute(
+            path: '/appointments',
+            pageBuilder: (context, state) =>
+                _fade(state, const AppointmentsPage()),
+          ),
+          GoRoute(
+            path: '/messages',
+            pageBuilder: (context, state) => _fade(state, const MessagesPage()),
+            routes: [
+              GoRoute(
+                path: ':id',
+                pageBuilder: (context, state) => _fade(
+                  state,
+                  ChatPage(conversationId: state.pathParameters['id'] ?? ''),
+                ),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: '/notifications',
+            pageBuilder: (context, state) =>
+                _fade(state, const NotificationsPage()),
           ),
         ],
       ),

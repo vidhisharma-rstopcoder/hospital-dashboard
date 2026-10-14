@@ -7,6 +7,8 @@ import 'package:hospital_dashboard/common/breakpoints.dart';
 import 'package:hospital_dashboard/common/widgets/hospital_logo.dart';
 import 'package:hospital_dashboard/common/widgets/mesh_backdrop.dart';
 import 'package:hospital_dashboard/features/auth/presentation/auth_controller.dart';
+import 'package:hospital_dashboard/features/clinic/domain/clinic_models.dart';
+import 'package:hospital_dashboard/features/clinic/presentation/clinic_providers.dart';
 import 'package:hospital_dashboard/theme/app_colors.dart';
 import 'package:hospital_dashboard/theme/app_theme.dart';
 
@@ -52,7 +54,10 @@ class _AppShellState extends ConsumerState<AppShell> {
                 const Positioned.fill(child: MeshBackdrop()),
                 Column(
                   children: [
-                    if (isMobile) const _MobileBar(),
+                    if (isMobile)
+                      const _MobileBar()
+                    else
+                      _TopBar(email: auth.email),
                     Expanded(child: widget.child),
                   ],
                 ),
@@ -105,6 +110,92 @@ class _MobileBar extends StatelessWidget {
   }
 }
 
+class _TopBar extends StatefulWidget {
+  const _TopBar({required this.email});
+
+  final String? email;
+
+  @override
+  State<_TopBar> createState() => _TopBarState();
+}
+
+class _TopBarState extends State<_TopBar> {
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _go() {
+    final query = _search.text.trim();
+    final path = query.isEmpty
+        ? '/patients'
+        : '/patients?q=${Uri.encodeQueryComponent(query)}';
+    context.go(path);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 68,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: AppColors.line)),
+      ),
+      child: Row(
+        children: [
+          Flexible(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: TextField(
+                controller: _search,
+                onSubmitted: (_) => _go(),
+                decoration: const InputDecoration(
+                  hintText: 'Search a patient name or ID',
+                  prefixIcon: Icon(Icons.search_rounded),
+                  isDense: true,
+                  filled: true,
+                  fillColor: AppColors.canvas,
+                ),
+              ),
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            tooltip: 'Notifications',
+            onPressed: () => context.go('/notifications'),
+            icon: const Icon(Icons.notifications_none_rounded),
+          ),
+          const SizedBox(width: 8),
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: AppColors.mint,
+            child: Text(
+              (widget.email ?? 'R').substring(0, 1).toUpperCase(),
+              style: const TextStyle(
+                color: AppColors.teal,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              widget.email ?? 'Staff',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Sidebar extends ConsumerWidget {
   const _Sidebar({
     required this.extended,
@@ -140,33 +231,51 @@ class _Sidebar extends ConsumerWidget {
             children: [
               _BrandLockup(extended: extended),
               const SizedBox(height: 28),
-              _NavButton(
-                extended: extended,
-                label: 'Dashboard',
-                icon: Icons.space_dashboard_rounded,
-                selected: location == '/dashboard',
-                onTap: () {
-                  onNavigate?.call();
-                  context.go('/dashboard');
-                },
-              ),
-              const SizedBox(height: 4),
-              _NavButton(
-                extended: extended,
-                label: 'Patients',
-                icon: Icons.personal_injury_outlined,
-                selected: location.startsWith('/patients'),
-                onTap: () {
-                  onNavigate?.call();
-                  context.go('/patients');
-                },
-              ),
-              const Spacer(),
-              if (extended) _StaffCard(email: email),
-              const SizedBox(height: 8),
-              _SignOutButton(
-                extended: extended,
-                onPressed: () => _confirmSignOut(context, ref),
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    for (final item in _destinations(
+                      ref.watch(authControllerProvider).role,
+                    )) ...[
+                      _NavButton(
+                        extended: extended,
+                        label: item.label,
+                        icon: item.icon,
+                        selected:
+                            location == item.path ||
+                            (item.path != '/dashboard' &&
+                                location.startsWith(item.path)),
+                        badge: item.path == '/notifications'
+                            ? ref
+                                  .watch(notificationFeedProvider)
+                                  .maybeWhen(
+                                    data: (notes) => notes
+                                        .where((note) => !note.isRead)
+                                        .length,
+                                    orElse: () => 0,
+                                  )
+                            : 0,
+                        onTap: () {
+                          onNavigate?.call();
+                          context.go(item.path);
+                        },
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    const SizedBox(height: 12),
+                    if (extended)
+                      _StaffCard(
+                        email: email,
+                        role: ref.watch(authControllerProvider).role,
+                      ),
+                    const SizedBox(height: 8),
+                    _SignOutButton(
+                      extended: extended,
+                      onPressed: () => _confirmSignOut(context, ref),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -219,6 +328,30 @@ class _Sidebar extends ConsumerWidget {
   }
 }
 
+class _NavItem {
+  const _NavItem(this.label, this.icon, this.path);
+
+  final String label;
+  final IconData icon;
+  final String path;
+}
+
+List<_NavItem> _destinations(UserRole role) {
+  return [
+    const _NavItem('Dashboard', Icons.space_dashboard_rounded, '/dashboard'),
+    const _NavItem('Patients', Icons.personal_injury_outlined, '/patients'),
+    if (role != UserRole.patient)
+      const _NavItem('Doctors', Icons.medical_services_outlined, '/doctors'),
+    const _NavItem('Appointments', Icons.event_note_rounded, '/appointments'),
+    const _NavItem('Messages', Icons.chat_bubble_outline_rounded, '/messages'),
+    const _NavItem(
+      'Notifications',
+      Icons.notifications_none_rounded,
+      '/notifications',
+    ),
+  ];
+}
+
 class _BrandLockup extends StatelessWidget {
   const _BrandLockup({required this.extended});
 
@@ -269,6 +402,7 @@ class _NavButton extends StatefulWidget {
     required this.icon,
     required this.selected,
     required this.onTap,
+    this.badge = 0,
   });
 
   final bool extended;
@@ -276,6 +410,7 @@ class _NavButton extends StatefulWidget {
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
+  final int badge;
 
   @override
   State<_NavButton> createState() => _NavButtonState();
@@ -311,9 +446,9 @@ class _NavButtonState extends State<_NavButton> {
               ),
               decoration: BoxDecoration(
                 color: selected
-                    ? Colors.white.withValues(alpha: 0.1)
+                    ? AppColors.teal
                     : _hover
-                    ? Colors.white.withValues(alpha: 0.05)
+                    ? Colors.white.withValues(alpha: 0.06)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -338,10 +473,14 @@ class _NavButtonState extends State<_NavButton> {
                         ),
                       ),
                     ),
-                  Icon(
-                    widget.icon,
-                    color: selected ? Colors.white : const Color(0xFFB7C0CC),
-                    size: 20,
+                  Badge(
+                    isLabelVisible: widget.badge > 0,
+                    label: Text('${widget.badge}'),
+                    child: Icon(
+                      widget.icon,
+                      color: selected ? Colors.white : const Color(0xFFB7C0CC),
+                      size: 20,
+                    ),
                   ),
                   if (extended) ...[
                     const SizedBox(width: 10),
@@ -370,9 +509,10 @@ class _NavButtonState extends State<_NavButton> {
 }
 
 class _StaffCard extends StatelessWidget {
-  const _StaffCard({required this.email});
+  const _StaffCard({required this.email, required this.role});
 
   final String? email;
+  final UserRole role;
 
   @override
   Widget build(BuildContext context) {
@@ -402,9 +542,13 @@ class _StaffCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Anil Mehta',
-                  style: TextStyle(
+                Text(
+                  switch (role) {
+                    UserRole.admin => 'Admin',
+                    UserRole.doctor => 'Doctor',
+                    UserRole.patient => 'Patient',
+                  },
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
                     fontSize: 13,

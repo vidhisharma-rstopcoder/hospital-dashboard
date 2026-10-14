@@ -1,4 +1,5 @@
 import 'package:hospital_dashboard/features/auth/presentation/auth_controller.dart';
+import 'package:hospital_dashboard/features/clinic/domain/clinic_models.dart';
 
 /// Decides where a browser location should land, including refresh and back.
 String? resolveRedirect({required AuthState auth, required Uri uri}) {
@@ -25,6 +26,21 @@ String? resolveRedirect({required AuthState auth, required Uri uri}) {
 
   if (path == '/login' || path == '/boot' || path == '/') {
     return safeReturnPath(from) ?? '/dashboard';
+  }
+  if (auth.role != UserRole.admin &&
+      (path == '/patients/new' || path == '/doctors/new')) {
+    return '/dashboard';
+  }
+  if (auth.role == UserRole.patient &&
+      (path.startsWith('/doctors') || path.endsWith('/edit'))) {
+    return '/dashboard';
+  }
+  if (auth.role == UserRole.doctor &&
+      path.startsWith('/doctors/') &&
+      path.endsWith('/edit') &&
+      auth.doctorId != null &&
+      !path.contains('/${auth.doctorId}/')) {
+    return '/dashboard';
   }
   return null;
 }

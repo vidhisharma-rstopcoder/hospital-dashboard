@@ -9,6 +9,9 @@ import 'package:hospital_dashboard/common/widgets/shimmer_box.dart';
 import 'package:hospital_dashboard/common/widgets/state_message.dart';
 import 'package:hospital_dashboard/common/widgets/status_chip.dart';
 import 'package:hospital_dashboard/common/widgets/surface_card.dart';
+import 'package:hospital_dashboard/features/auth/presentation/auth_controller.dart';
+import 'package:hospital_dashboard/features/clinic/domain/clinic_models.dart';
+import 'package:hospital_dashboard/features/clinic/presentation/clinic_providers.dart';
 import 'package:hospital_dashboard/features/dashboard/domain/dashboard_stats.dart';
 import 'package:hospital_dashboard/features/dashboard/presentation/dashboard_providers.dart';
 import 'package:hospital_dashboard/features/dashboard/presentation/widgets/admission_charts.dart';
@@ -69,7 +72,9 @@ class _DashboardBody extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Entrance(child: _Header(now: now)),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 16),
+                  const _ClinicStrip(),
+                  const SizedBox(height: 16),
                   Wrap(
                     spacing: gap,
                     runSpacing: gap,
@@ -80,7 +85,7 @@ class _DashboardBody extends StatelessWidget {
                         StatCard(
                           label: 'Total patients',
                           value: stats.total,
-                          caption: 'All records',
+                          caption: 'All records on this desk',
                           icon: Icons.groups_rounded,
                           accent: AppColors.teal,
                           onTap: () => context.go('/patients'),
@@ -92,7 +97,7 @@ class _DashboardBody extends StatelessWidget {
                         StatCard(
                           label: 'Currently admitted',
                           value: stats.byStatus[PatientStatus.admitted] ?? 0,
-                          caption: 'Status: Admitted',
+                          caption: stats.shareLabel(PatientStatus.admitted),
                           icon: Icons.bed_rounded,
                           accent: AppColors.admitted,
                           onTap: () => context.go('/patients?status=Admitted'),
@@ -104,7 +109,7 @@ class _DashboardBody extends StatelessWidget {
                         StatCard(
                           label: 'Discharged patients',
                           value: stats.discharged,
-                          caption: 'Status: Discharged',
+                          caption: stats.shareLabel(PatientStatus.discharged),
                           icon: Icons.exit_to_app_rounded,
                           accent: AppColors.discharged,
                           onTap: () =>
@@ -117,7 +122,7 @@ class _DashboardBody extends StatelessWidget {
                         StatCard(
                           label: "Today's admissions",
                           value: stats.todaysAdmissions,
-                          caption: DateFormat('d MMM').format(now),
+                          caption: stats.todayChange,
                           icon: Icons.today_rounded,
                           accent: AppColors.gold,
                           onTap: () => context.go('/patients'),
@@ -152,6 +157,84 @@ class _DashboardBody extends StatelessWidget {
         child: child,
       ),
     );
+  }
+}
+
+class _ClinicStrip extends ConsumerWidget {
+  const _ClinicStrip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summary = ref.watch(clinicSummaryProvider);
+    final role = ref.watch(authControllerProvider).role;
+    return summary.maybeWhen(
+      data: (data) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _Pill('Patients', data.totalPatients),
+              _Pill('Doctors', data.totalDoctors),
+              _Pill('Active links', data.activeRelationships),
+              _Pill('Upcoming', data.upcomingAppointments),
+              _Pill('Requests', data.pendingRequests),
+              _Pill('Unread', data.unreadMessages),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (role == UserRole.admin)
+                _Action('Add patient', () => context.go('/patients/new')),
+              if (role == UserRole.admin)
+                _Action('Add doctor', () => context.go('/doctors/new')),
+              _Action('Appointments', () => context.go('/appointments')),
+              _Action('Messages', () => context.go('/messages')),
+            ],
+          ),
+        ],
+      ),
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill(this.label, this.value);
+
+  final String label;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Text(
+        '$value $label',
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+      ),
+    );
+  }
+}
+
+class _Action extends StatelessWidget {
+  const _Action(this.label, this.onTap);
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(onPressed: onTap, child: Text(label));
   }
 }
 

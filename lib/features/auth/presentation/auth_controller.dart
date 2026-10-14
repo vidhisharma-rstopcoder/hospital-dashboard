@@ -1,4 +1,6 @@
 import 'package:hospital_dashboard/features/auth/data/auth_repository.dart';
+import 'package:hospital_dashboard/features/clinic/data/clinic_store.dart';
+import 'package:hospital_dashboard/features/clinic/domain/clinic_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,6 +11,9 @@ class AuthState {
     required this.ready,
     required this.authenticated,
     this.email,
+    this.role = UserRole.doctor,
+    this.patientId,
+    this.doctorId,
     this.submitting = false,
     this.errorMessage,
   });
@@ -17,6 +22,9 @@ class AuthState {
     : ready = false,
       authenticated = false,
       email = null,
+      role = UserRole.doctor,
+      patientId = null,
+      doctorId = null,
       submitting = false,
       errorMessage = null;
 
@@ -24,15 +32,39 @@ class AuthState {
     return const AuthState(ready: true, authenticated: false);
   }
 
-  factory AuthState.signedIn(String email) {
-    return AuthState(ready: true, authenticated: true, email: email);
+  factory AuthState.signedIn(
+    String email, {
+    UserRole role = UserRole.doctor,
+    int? patientId,
+    String? doctorId,
+  }) {
+    return AuthState(
+      ready: true,
+      authenticated: true,
+      email: email,
+      role: role,
+      patientId: patientId,
+      doctorId: doctorId,
+    );
   }
 
   final bool ready;
   final bool authenticated;
   final String? email;
+  final UserRole role;
+  final int? patientId;
+  final String? doctorId;
   final bool submitting;
   final String? errorMessage;
+
+  Actor get actor {
+    return Actor(
+      role: role,
+      email: email ?? '',
+      patientId: patientId,
+      doctorId: doctorId,
+    );
+  }
 
   AuthState copyWith({
     bool? ready,
@@ -42,11 +74,18 @@ class AuthState {
     bool? submitting,
     String? errorMessage,
     bool clearError = false,
+    UserRole? role,
+    int? patientId,
+    String? doctorId,
+    bool clearLinks = false,
   }) {
     return AuthState(
       ready: ready ?? this.ready,
       authenticated: authenticated ?? this.authenticated,
       email: clearEmail ? null : (email ?? this.email),
+      role: role ?? this.role,
+      patientId: clearLinks ? null : (patientId ?? this.patientId),
+      doctorId: clearLinks ? null : (doctorId ?? this.doctorId),
       submitting: submitting ?? this.submitting,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
@@ -54,10 +93,6 @@ class AuthState {
 }
 
 class AuthController extends Notifier<AuthState> {
-  AuthController(this._repository);
-
-  final AuthRepository _repository;
-
   @override
   AuthState build() {
     _restore();
@@ -69,9 +104,21 @@ class AuthController extends Notifier<AuthState> {
       final prefs = await SharedPreferences.getInstance();
       final email = prefs.getString(sessionEmailKey);
       if (!ref.mounted) return;
-      state = email == null || email.isEmpty
+      if (email == null || email.isEmpty) {
+        state = AuthState.signedOut();
+        return;
+      }
+      final store = await ref.read(clinicStoreProvider.future);
+      final user = await store.userByEmail(email);
+      if (!ref.mounted) return;
+      state = user == null
           ? AuthState.signedOut()
-          : AuthState.signedIn(email);
+          : AuthState.signedIn(
+              user.email,
+              role: user.role,
+              patientId: user.patientId,
+              doctorId: user.doctorId,
+            );
     } catch (_) {
       if (!ref.mounted) return;
       state = AuthState.signedOut();
@@ -81,11 +128,17 @@ class AuthController extends Notifier<AuthState> {
   Future<bool> signIn(String email, String password) async {
     state = state.copyWith(submitting: true, clearError: true);
     try {
-      final sessionEmail = await _repository.signIn(email, password);
+      final store = await ref.read(clinicStoreProvider.future);
+      final user = await store.authenticate(email, password);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(sessionEmailKey, sessionEmail);
+      await prefs.setString(sessionEmailKey, user.email);
       if (!ref.mounted) return false;
-      state = AuthState.signedIn(sessionEmail);
+      state = AuthState.signedIn(
+        user.email,
+        role: user.role,
+        patientId: user.patientId,
+        doctorId: user.doctorId,
+      );
       return true;
     } on AuthException catch (error) {
       if (!ref.mounted) return false;
@@ -115,5 +168,5 @@ class AuthController extends Notifier<AuthState> {
 }
 
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(
-  () => AuthController(AuthRepository()),
+  AuthController.new,
 );

@@ -30,24 +30,37 @@ flutter run -d web-server --web-port 8090 --web-hostname 127.0.0.1
 
 Then open `http://127.0.0.1:8090`.
 
-### Test account
+### Test accounts
 
-| Field | Value |
-| --- | --- |
-| Email | `doctor@cityhospital.org` |
-| Password | `Ward1234` |
+These are development accounts only. The password is `Ward1234` for each. The login screen has Admin, Doctor, and Patient buttons that fill them. The password is hashed before it is written to the local database. It is not a production credential.
 
-The login screen has a Fill button for these. Any other email or password is rejected after the format checks.
+| Role | Email | What you can open |
+| --- | --- | --- |
+| Admin | `admin@cityhospital.org` | Full ward list, register patients and doctors, assign doctors |
+| Doctor | `doctor@cityhospital.org` | Patients assigned to Anil Mehta, their consultations and chats |
+| Patient | `patient@cityhospital.org` | Rahul Sharma (patient 123) only, plus chat with the assigned doctor |
 
-The session is stored with `shared_preferences`. A refresh keeps you signed in. Sign out clears it.
+The session email is stored with `shared_preferences`. The role is read again from the clinic database on refresh, so editing the saved email does not grant another role. Sign out clears the session.
 
 ## What it does
 
-- Login with email and password. Empty, badly formatted, and wrong credentials show an error.
-- Dashboard is titled Rounds. Cards: total patients, currently admitted, discharged, and today's admissions. A donut shows status counts and a bar chart shows the last 7 days.
-- Ward list: ID, name, gender, date of birth, admission date, status, and Open. Search by name or ID. Status is a row of chips (All, Admitted, Discharged, Observation, Critical). 10 rows per page. The count on the right is how many records match.
+- Login with email and password. Empty, badly formatted, and wrong credentials show an error. Remember me stores the email on this browser. Forgot password explains that this demo does not send reset mail.
+- Dashboard is titled Rounds. Cards: total patients, currently admitted, discharged, and today's admissions. A line chart shows the last 7 days and a donut shows status counts.
+- Ward list: ID, name, gender, date of birth, admission date, status, and Open. Search by name or ID. Status chips are All, Admitted, Discharged, Under Observation, and Critical. The address bar still uses `Observation`. 10 rows per page. The count on the right is how many records match.
 - Patient details at `/patients/123` (Rahul Sharma). Refresh, back, and forward keep the route. List filters are in the query string (`q`, `status`, `page`).
 - Desktop uses a sidebar and a table. Tablet uses an icon rail. Phone uses a drawer and cards, so the page does not scroll sideways.
+- Admin can register, edit, and delete patients and doctors. A patient record includes contact details, blood group, history, allergies, medications, emergency contact, and an assigned doctor.
+- A doctor keeps a profile with specialization, fee, days, time slots, and an optional photo. Cards can be searched and filtered by specialization.
+- Assignment stores patient id and doctor id on a relationship (`pending`, `active`, `inactive`). One active doctor per patient. Reassigning closes the previous active link. The patient profile and the doctor's patient list both read that link.
+- A patient can request a consultation. The doctor accepts, rejects, or either side cancels. Each step writes a notification.
+- Chat is limited to the patient and the assigned doctor. Messages keep sender, receiver, time, and sent / delivered / read. History stays in the local database.
+- The notification centre has an unread badge, mark-one, and mark-all. Tapping a notification opens the related screen.
+
+Records are stored with sembast (IndexedDB on web, a file on desktop). They survive a browser refresh. Shared preferences holds only the signed-in email.
+
+In-app updates use a broadcast stream. On web, a second tab signed in as the other person receives new messages and notifications through `BroadcastChannel`. That is real delivery inside one browser, not a timer. It is not cross-device sync.
+
+Firebase is not connected. `firestore.rules` is the access policy to deploy if you add Firebase Authentication and Cloud Firestore later. OS push notifications are not implemented, because Firebase Cloud Messaging and Cloud Functions need a project and must not ship with a server key in the app. Do not describe the current chat as Firebase realtime.
 
 Loading, empty, and error states are included. To force the error state:
 
@@ -132,7 +145,7 @@ flutter build web --release \
 flutter test
 ```
 
-Covers the JSON parser, paging, search, status filters, dashboard totals, login checks, and the redirect rules.
+Covers the JSON parser, paging, search, status filters, dashboard totals, login checks, redirect rules, form validation, role checks, assignment, chat, and notification read state.
 
 ## Assumptions
 
